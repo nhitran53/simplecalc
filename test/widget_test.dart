@@ -9,12 +9,14 @@ void main() {
   testWidgets('adds two numbers', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
 
-    await tester.tap(find.widgetWithText(FilledButton, '7'));
+    await tester.tap(find.widgetWithText(FilledButton, '2'));
+    await tester.pump();
     await tester.tap(find.widgetWithText(FilledButton, '+'));
-    await tester.tap(find.widgetWithText(FilledButton, '5'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, '2'));
+    await tester.pump();
     await tester.tap(find.widgetWithText(FilledButton, '='));
     await tester.pump();
-
-    expect(find.text('12'), findsOneWidget);
+    expect(find.text('4'), findsOneWidget);
   });
 }
