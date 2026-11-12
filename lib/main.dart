@@ -37,8 +37,19 @@ class _CalculatorPageState extends State<CalculatorPage> {
   // True right after an operator or equals, so the next digit starts fresh.
   bool _startNewNumber = true;
 
+  // True right after an operator key, before any second number is entered.
+  // A second operator press then replaces the operator instead of computing.
+  bool _awaitingOperand = false;
+
+  // The display shows 'Error' (e.g. after dividing by zero). Only digits,
+  // the decimal point and C do anything until a new number is started.
+  bool get _isError => _display == _errorText;
+
+  static const _errorText = 'Error';
+
   void _onDigit(String digit) {
     setState(() {
+      _awaitingOperand = false;
       if (_startNewNumber) {
         _display = digit;
         _startNewNumber = false;
@@ -52,6 +63,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
 
   void _onDecimal() {
     setState(() {
+      _awaitingOperand = false;
       if (_startNewNumber) {
         _display = '0.';
         _startNewNumber = false;
@@ -62,21 +74,33 @@ class _CalculatorPageState extends State<CalculatorPage> {
   }
 
   void _onOperator(String operator) {
+    if (_isError) return;
     setState(() {
       final current = double.parse(_display);
-      if (_pending != null && _operator != null && !_startNewNumber) {
-        _pending = _compute(_pending!, current, _operator!);
-        _display = _format(_pending!);
+      if (_pending != null && _operator != null && !_awaitingOperand) {
+        final result = _compute(_pending!, current, _operator!);
+        _display = _format(result);
+        if (_isError) {
+          _pending = null;
+          _operator = null;
+          _awaitingOperand = false;
+          _startNewNumber = true;
+          return;
+        }
+        _pending = result;
       } else {
         _pending = current;
       }
       _operator = operator;
+      _awaitingOperand = true;
       _startNewNumber = true;
     });
   }
 
   void _onEquals() {
+    if (_isError) return;
     setState(() {
+      _awaitingOperand = false;
       if (_pending == null || _operator == null) return;
       final result = _compute(_pending!, double.parse(_display), _operator!);
       _display = _format(result);
@@ -91,12 +115,15 @@ class _CalculatorPageState extends State<CalculatorPage> {
       _display = '0';
       _pending = null;
       _operator = null;
+      _awaitingOperand = false;
       _startNewNumber = true;
     });
   }
 
   void _onSign() {
+    if (_isError) return;
     setState(() {
+      _awaitingOperand = false;
       if (_display.startsWith('-')) {
         _display = _display.substring(1);
       } else if (_display != '0') {
@@ -106,7 +133,10 @@ class _CalculatorPageState extends State<CalculatorPage> {
   }
 
   void _onPercent() {
+    if (_isError) return;
     setState(() {
+      // The percent value is the second operand, not a replacement operator.
+      _awaitingOperand = false;
       _display = _format(double.parse(_display) / 100);
       _startNewNumber = true;
     });
@@ -127,13 +157,16 @@ class _CalculatorPageState extends State<CalculatorPage> {
     }
   }
 
-  // Drop the trailing ".0" so whole numbers read as "12", not "12.0".
+  // Round to 12 significant digits to hide floating-point noise
+  // (0.1 + 0.2 shows "0.3", not "0.30000000000000004"), then drop the
+  // trailing ".0" so whole numbers read as "12", not "12.0".
   String _format(double value) {
-    if (value.isNaN || value.isInfinite) return 'Error';
-    if (value == value.roundToDouble() && value.abs() < 1e15) {
-      return value.toInt().toString();
+    if (value.isNaN || value.isInfinite) return _errorText;
+    final rounded = double.parse(value.toStringAsPrecision(12));
+    if (rounded == rounded.roundToDouble() && rounded.abs() < 1e15) {
+      return rounded.toInt().toString();
     }
-    return value.toString();
+    return rounded.toString();
   }
 
   @override

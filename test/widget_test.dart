@@ -45,4 +45,39 @@ void main() {
   testWidgets('adds two decimals', (WidgetTester tester) async {
     await expectResult(tester, '3.5+1.25=', '4.75');
   });
+
+  // Regression tests for bugs found in code review.
+  group('regressions', () {
+    testWidgets('pressing an operator after divide-by-zero does not crash',
+        (WidgetTester tester) async {
+      await expectResult(tester, '5÷0=', 'Error');
+      await tapKeys(tester, '+%=');
+      expect(find.text('Error'), findsOneWidget);
+    });
+
+    testWidgets('+/- on the error screen leaves it unchanged',
+        (WidgetTester tester) async {
+      await expectResult(tester, '1÷0=', 'Error');
+      await tester.tap(find.widgetWithText(FilledButton, '+/-'));
+      await tester.pump();
+      expect(find.text('Error'), findsOneWidget);
+    });
+
+    testWidgets('a digit after an error starts a new calculation',
+        (WidgetTester tester) async {
+      await expectResult(tester, '1÷0=', 'Error');
+      await tapKeys(tester, '12+3=');
+      expect(find.text('15'), findsOneWidget);
+    });
+
+    testWidgets('chaining after % keeps the first number',
+        (WidgetTester tester) async {
+      await expectResult(tester, '50+10%+5=', '55.1');
+    });
+
+    testWidgets('hides floating-point rounding noise',
+        (WidgetTester tester) async {
+      await expectResult(tester, '.1+.2=', '0.3');
+    });
+  });
 }
